@@ -80,4 +80,7 @@ ass="list-clean">${g.lines.length?g.lines.map(x=>`<li><span class="relation-tag"
       <div class="card"><div class="section-title">命局基础数据</div><div class="kv-grid">${kv('日主',`${dm} · ${STEM_INFO[dm]?.join('')||'—'}`)}${kv('月令',p.month?.[1]||'—')}${extra.map(([k,v])=>kv(k,v)).join('')}</div><div class="note-line">十神、藏干、纳音、地势与旬空均按同一四柱规则计算；“胎元/胎息/命宫/身宫”属于传统命理辅助信息，不作为现代科学预测结论。</div></div>
       ${renderDaYun(chart)}
       ${window.BaziStrength?window.BaziStrength.renderNatal(p):''}
+      ${window.BaziAdvanced?window.BaziAdvanced.renderPattern(p):''}
+      ${window.BaziAdvanced?window.BaziAdvanced.renderClimate(p):''}
+      ${window.BaziAdvanced?window.BaziAdvanced.renderComposite(p):''}
       <div class="card hidden"><div cl
