@@ -1,0 +1,84 @@
+function fmtPct(v){return (v*100).toFixed(1)+'%'}
+function colorText(elements){return elements.filter(Boolean).flatMap(el=>(COLORS[el]||[]).map(c=>el+'·'+c)).join(' / ')||'—'}
+function activityForGod(god){
+  const map={
+    比肩:['协作、同辈沟通、自己推进','合伙账目与利益边界要写清楚'],
+    劫财:['团队协同、资源整合、执行推进','借贷、冲动竞争、临时加码要谨慎'],
+    正印:['学习、复盘、资料整理、证照手续','避免只准备不行动'],
+    偏印:['研究、独立思考、技术性工作','避免钻牛角尖或频繁改方案'],
+    食神:['表达、创作、沟通、生活安排','避免节奏过松'],
+    伤官:['输出、创意、谈判、发现问题','与规则/上级硬碰时宜留余地'],
+    正财:['预算、对账、采购、落实交易','不宜情绪性消费'],
+    偏财:['商务接触、资源信息、市场观察','临时投资和人情支出宜设上限'],
+    正官:['手续、合同、制度内事项、按计划完成','避免拖延截止事项'],
+    七杀:['处理紧急任务、攻坚、明确边界','高压决策宜先核实信息']
+  };
+  return map[god]||['按原计划处理重要事项','不以单一十神替代现实判断'];
+}
+function renderBars(a){
+  return '<div class="element-bars">'+a.elementRows.map(r=>`
+    <div class="element-row">
+      <div class="element-meta"><b>${r.el}</b><span>${r.role} · ${r.season}</span><strong>${fmtPct(r.pct)}</strong></div>
+      <div class="element-track"><i style="width:${Math.max(2,r.pct*100)}%"></i></div>
+    </div>`).join('')+'</div>';
+}
+function renderNatal(pillars){
+  const a=analyze(pillars); if(!a)return '';
+  const roots=a.roots.length?a.roots.map(r=>`${posName[r.pos]}${r.branch}：${r.label}`).join('；'):'未见日干直接通根';
+  const through=a.through.map(x=>`${x.level}${x.stem}（${x.god}）${x.through?'已透干':'未透干'}`).join('；');
+  const direction=a.candidate
+    ? `<div class="warning strong-warning"><b>${esc(a.candidate)}</b><br>该结构已接近普通扶抑法的适用边界，本版不直接给“喜用神”结论，需由格局法/从格条件继续复核。</div>`
+    : `<div class="use-grid">
+        <div><b>扶抑优先</b><strong>${esc(a.primary)} → ${esc(a.secondary)}</strong><small>方向：${esc(a.direction.join('、'))}</small></div>
+        <div><b>慎增方向</b><strong>${esc(a.avoid.join('、'))}</strong><small>这是扶抑取向，不等同于唯一终身用神</small></div>
+      </div>
+      <div class="color-line"><b>辅助色参考：</b>${esc(colorText([a.primary,a.secondary]))}</div>`;
+  const monthThrough=a.through.find(x=>x.stem===a.monthMain)?.through;
+  return `<div class="card strength-card">
+    <div class="section-title">旺衰与扶抑分析 <span class="beta-tag">v0.3</span></div>
+    <div class="warning">采用“${esc(a.model)}”。月令优先，并将天干、地支藏干、通根与季节旺相休囚死转为公开权重。<b>量化权重是本应用的可复算模型，不是古籍统一分值标准。</b></div>
+    <div class="strength-summary">
+      <div><span>日主</span><strong>${esc(a.dayStem)} · ${a.dm}</strong></div>
+      <div><span>旺衰层级</span><strong>${esc(a.level)}</strong></div>
+      <div><span>扶助比</span><strong>${fmtPct(a.support)}</strong></div>
+      <div><span>月令</span><strong>${esc(a.monthBranch)} · ${esc(a.deLing)}</strong></div>
+    </div>
+    ${renderBars(a)}
+    <div class="evidence-list">
+      <p><b>得地 / 通根：</b>${esc(roots)}</p>
+      <p><b>得势：</b>${esc(a.deShi)}；干上扶身 ${['year','month','time'].filter(k=>a.pillars[k]&&[a.dm,a.resource].includes(E[a.pillars[k][0]])).length} 位。</p>
+      <p><b>月令格局线索：</b>${esc(a.monthMain)} 为月令本气，十神为 ${esc(a.monthMainGod)}，${monthThrough?'已在天干透出':'未见同字透干'}。本版只显示线索，不据此单独定格。</p>
+      <p><b>月令藏干：</b>${esc(through)}</p>
+    </div>
+    ${direction}
+    <div class="note-line">扶抑法适合判断“日主承受力与五行平衡方向”，但从格、化格、专旺、调候急迫等情况不能只靠一个强弱比例判断，所以这些边界会主动停止自动结论。</div>
+  </div>`;
+}
+function renderDaily(natalPillars,transitPillars){
+  const a=analyze(natalPillars); if(!a||!transitPillars?.day)return '';
+  const dayGz=transitPillars.day,st=dayGz[0],br=dayGz[1],el=E[st],god=tenGod(a.dayStem,st);
+  const favorable=!a.candidate&&a.direction.includes(el);
+  const adverse=!a.candidate&&a.avoid.includes(el);
+  let impact='中性观察';
+  if(a.candidate)impact='边界命局，不自动判喜忌';
+  else if(favorable)impact='流日天干落在扶抑有利方向';
+  else if(adverse)impact='流日天干落在当前慎增方向';
+  const [good,caution]=activityForGod(god);
+  const recommended=a.candidate?[]:[a.primary,a.secondary].filter(Boolean);
+  return `<div class="daily-balance">
+    <div class="section-title">个人日用参考 · 扶抑法</div>
+    <div class="daily-grid">
+      <div><span>流日十神</span><strong>${esc(dayGz)} · ${esc(god)}</strong></div>
+      <div><span>对原局作用</span><strong>${esc(impact)}</strong></div>
+      <div><span>辅助五行</span><strong>${esc(recommended.join('、')||'暂不判')}</strong></div>
+      <div><span>颜色参考</span><strong>${esc(colorText(recommended))}</strong></div>
+    </div>
+    <div class="yi-ji personal-yi-ji">
+      <div class="yi"><b>宜参考</b><p>${esc(good)}${favorable?'；当天五行方向与扶抑目标一致，可按正常节奏推进':''}</p></div>
+      <div class="ji"><b>慎参考</b><p>${esc(caution)}${adverse?'；当天五行会进一步偏向原局较重一侧，重要事项多做一次核对':''}</p></div>
+    </div>
+    <div class="note-line">这是传统十神与扶抑规则的生活化提示，不是对现实结果的保证，也不会覆盖你当天真实的工作、健康、财务或法律条件。</div>
+  </div>`;
+}
+window.BaziStrength={analyze,renderNatal,renderDaily,version:'0.3.0'};
+})();
