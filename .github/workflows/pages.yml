@@ -72,3 +72,31 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
+
+      - name: Checkout for live deployment verification
+        uses: actions/checkout@v4
+
+      - name: Verify public Pages release
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://yangjunjie0226-bot.github.io/YJJ"
+          for attempt in $(seq 1 18); do
+            ready=true
+            for file in index.html app.js bazi-engine.js bazi-advanced.js bazi-v05.js styles.css sw.js; do
+              if ! curl -fsSL --max-time 20 "$base/$file?release=$GITHUB_SHA&attempt=$attempt" -o "/tmp/live-$file" || ! cmp -s "src/$file" "/tmp/live-$file"; then
+                ready=false
+                break
+              fi
+            done
+            if [ "$ready" = true ]; then break; fi
+            sleep 10
+          done
+          test "$ready" = true
+          for file in manifest.webmanifest lunar.js icons/icon-180.png icons/icon-192.png icons/icon-512.png; do
+            curl -fsSL --retry 3 --max-time 30 "$base/$file?release=$GITHUB_SHA" -o /tmp/live-asset
+            test -s /tmp/live-asset
+          done
+          curl -fsSL --retry 3 --max-time 30 "$base/" -o /tmp/live-home.html
+          grep -q 'bazi-v05.js' /tmp/live-home.html
+          echo "Verified public v0.5.0 files and offline assets at $base/"
