@@ -1,0 +1,43 @@
+ass="section-title">喜用神与个人宜忌</div><p class="muted paragraph">高级规则引擎仍未启用。本版继续不输出随机“喜用神、幸运色、吉凶分数”。下一阶段会先固定旺衰/格局/调候的具体体系，再开放结论和计算依据。</p></div>`;
+  }
+
+  function fillProfileForm(){
+    const p=state.profile||{};
+    $('#calendarType').value=p.calendarType||'solar';$('#birthYear').value=p.year||'';$('#birthMonth').value=p.month||'';$('#birthDay').value=p.day||'';$('#birthTime').value=p.time||'';$('#gender').value=p.gender||'unknown';$('#birthPlace').value=p.birthPlace||'';$('#birthLeap').checked=!!p.leap;$('#ziRule').value=p.ziRule||'sect2';$('#yunRule').value=String(p.yunRule||1);$('#trueSolarTime').checked=!!p.trueSolarTime;
+    $('#leapMonthRow').classList.toggle('hidden',$('#calendarType').value!=='lunar');
+    const version=$('#versionInfo'); if(version) version.textContent=`玄历 v${APP_VERSION} · lunar-javascript ${LUNAR_LIB_VERSION}`;
+  }
+
+  function switchView(name){
+    const map={calendar:'#calendarView',detail:'#detailView',chart:'#chartView',profile:'#profileView'};
+    $$('.view').forEach(v=>v.classList.remove('active'));$(map[name]).classList.add('active');
+    $$('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===name));
+    const titles={calendar:'玄历',detail:'日期详情',chart:'我的命盘',profile:'我的'};$('#pageTitle').textContent=titles[name];
+    if(name==='detail')renderDetail();if(name==='chart')renderChart();if(name==='profile')fillProfileForm();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  function bind(){
+    $('#prevMonth').addEventListener('click',()=>{state.cursor=new Date(state.cursor.getFullYear(),state.cursor.getMonth()-1,1);renderCalendar();});
+    $('#nextMonth').addEventListener('click',()=>{state.cursor=new Date(state.cursor.getFullYear(),state.cursor.getMonth()+1,1);renderCalendar();});
+    $('#todayBtn').addEventListener('click',()=>{state.selected=new Date();state.cursor=new Date(state.selected.getFullYear(),state.selected.getMonth(),1);renderCalendar();renderDetail();switchView('detail');});
+    $$('.tab').forEach(t=>t.addEventListener('click',()=>switchView(t.dataset.view)));
+    $$('[data-go]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.go)));
+    $('#calendarType').addEventListener('change',()=>$('#leapMonthRow').classList.toggle('hidden',$('#calendarType').value!=='lunar'));
+    $('#profileForm').addEventListener('submit',e=>{
+      e.preventDefault();
+      const p={calendarType:$('#calendarType').value,year:Number($('#birthYear').value),month:Number($('#birthMonth').value),day:Number($('#birthDay').value),time:$('#birthTime').value,gender:$('#gender').value,birthPlace:$('#birthPlace').value.trim(),leap:$('#birthLeap').checked,ziRule:$('#ziRule').value,yunRule:Number($('#yunRule').value||1),trueSolarTime:$('#trueSolarTime').checked};
+      if(!p.year||!p.month||!p.day){toast('请填写出生年月日');return;}
+      if(p.trueSolarTime){toast('真太阳时校正尚未启用，本次仍按输入时间排盘');p.trueSolarTime=false;$('#trueSolarTime').checked=false;}
+      try{state.profile=p;const test=birthChart();if(!test)throw new Error('排盘失败');saveProfile(p);renderChart();renderDetail();toast('出生资料已保存');switchView('chart');}catch(err){console.error(err);toast('日期无效，请检查输入');}
+    });
+    $('#clearProfile').addEventListener('click',()=>{localStorage.removeItem(STORAGE_KEY);state.profile=null;fillProfileForm();renderChart();renderDetail();toast('已清除本机出生资料');});
+  }
+
+  function init(){
+    bind();fillProfileForm();renderCalendar();renderDetail();renderChart();
+    if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
