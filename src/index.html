@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="theme-color" content="#101614" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="玄历" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/icon-180.png" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>玄历 · 万年历与八字日历</title>
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">万年历 · 八字个人日历</div>
+        <h1 id="pageTitle">玄历</h1>
+      </div>
+      <button id="todayBtn" class="ghost-btn">今天</button>
+    </header>
+
+    <main class="main">
+      <section id="calendarView" class="view active">
+        <div class="month-toolbar card">
+          <button id="prevMonth" class="round-btn" aria-label="上个月">‹</button>
+          <button id="monthTitle" class="month-title"></button>
+          <button id="nextMonth" class="round-btn" aria-label="下个月">›</button>
+        </div>
+        <div id="solarTermStrip" class="term-strip"></div>
+        <div class="weekday-row">
+          <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+      </section>
+
+      <section id="detailView" class="view">
+        <div id="dateHero" class="date-hero card"></div>
+        <div id="personalToday" class="card hidden"></div>
+        <div id="ganzhiCard" class="card"></div>
+        <div id="jieqiCard" class="card"></div>
+        <div id="huangliCard" class="card"></div>
+        <div id="hourCard" class="card"></div>
+      </section>
+
+      <section id="chartView" class="view">
+        <div id="chartEmpty" class="empty-card card">
+          <h2>还没有出生资料</h2>
+          <p>先到“我的”填写出生年月日。时辰不知道可以留空，系统不会自动编造时柱。</p>
+          <button class="primary-btn" data-go="profile">去填写</button>
+        </div>
+        <div id="chartContent" class="hidden"></div>
+      </section>
+
+      <section id="profileView" class="view">
+        <form id="profileForm" class="card form-card">
+          <div class="section-title">我的出生资料</div>
+          <label>历法
+            <select id="calendarType">
+              <option value="solar">公历</option>
+              <option value="lunar">农历</option>
+            </select>
+          </label>
+          <div class="form-grid-3">
+            <label>年<input id="birthYear" inputmode="numeric" min="1900" max="2100" type="number" placeholder="1990" /></label>
+            <label>月<input id="birthMonth" inputmode="numeric" min="1" max="12" type="number" placeholder="1" /></label>
+            <label>日<input id="birthDay" inputmode="numeric" min="1" max="31" type="number" placeholder="1" /></label>
+          </div>
+          <label id="leapMonthRow" class="check-row hidden"><input id="birthLeap" type="checkbox" /> 农历闰月</label>
+          <div class="form-grid-2">
+            <label>出生时间
+              <input id="birthTime" type="time" />
+              <small>不知道可留空</small>
+            </label>
+            <label>性别
+              <select id="gender"><option value="male">男</option><option value="female">女</option><option value="unknown">未设置</option></select>
+            </label>
+          </div>
+          <label>出生地<input id="birthPlace" type="text" placeholder="例如：湖南怀化（可暂不填）" /></label>
+
+          <div class="section-title compact">排盘规则</div>
+          <label>晚子时换日
+            <select id="ziRule">
+              <option value="sect1">23:00后日柱按次日（流派1）</option>
+              <option value="sect2">23:00-23:59仍按当日（流派2）</option>
+            </select>
+          </label>
+          <label>大运起运算法
+            <select id="yunRule">
+              <option value="1">流派1：3天1年、1天4个月、1时辰10天</option>
+              <option value="2">流派2：按分钟折算</option>
+            </select>
+          </label>
+          <label class="check-row"><input id="trueSolarTime" type="checkbox" /> 真太阳时校正（预留，当前不启用）</label>
+          <button class="primary-btn" type="submit">保存并排盘</button>
+          <button id="clearProfile" class="danger-btn" type="button">清除资料</button>
+        </form>
+
+        <div class="card note-card">
+          <div class="section-title">计算原则</div>
+          <p>历法、干支、节气、黄历和八字基础数据使用固定历法算法；个人“刑冲合害”等由规则引擎计算，不使用随机文案。</p>
+          <p>十神、藏干、纳音、地势、旬空、大运等使用同一套可复算规则。喜用神、格局、个人宜忌存在不同命理体系，不会用“五行缺什么就补什么”的简化方式冒充专业结论。</p>
+          <p id="versionInfo" class="version-info"></p>
+        </div>
+
+        <div class="card install-card">
+          <div class="section-title">安装到 iPhone</div>
+          <ol><li>用 Safari 打开本应用网址。</li><li>点底部“分享”。</li><li>选择“添加到主屏幕”。</li><li>以后从桌面图标打开即可。</li></ol>
+        </div>
+      </section>
+    </main>
+
+    <nav class="tabbar">
+      <button class="tab active" data-view="calendar"><span>历</span><b>日历</b></button>
+      <button class="tab" data-view="detail"><span>今</span><b>日期</b></button>
+      <button class="tab" data-view="chart"><span>命</span><b>命盘</b></button>
+      <button class="tab" data-view="profile"><span>我</span><b>我的</b></button>
+    </nav>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="./lunar.js"></script>
+  <script src="./bazi-engine.js"></script>
+  <script src="./bazi-advanced.js"></script>
+  <script src="./bazi-v05.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
+
