@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
   const STORAGE_KEY = 'xuanli.profile.v1';
-  const APP_VERSION = '0.2.0';
+  const APP_VERSION = '0.3.0';
   const LUNAR_LIB_VERSION = '1.7.7';
 
   const STEMS = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
