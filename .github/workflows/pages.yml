@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Rebuild site from deployment payload
+      - name: Rebuild base site
         shell: bash
         run: |
           set -euo pipefail
@@ -29,9 +29,19 @@ jobs:
           cat .deploy/part*.b64 | base64 -d > /tmp/xuanli.zip
           unzip -q /tmp/xuanli.zip -d /tmp/xuanli-src
           cp -R /tmp/xuanli-src/bazi-calendar-pwa/. site/
-          if [ -d src-overrides ]; then
-            cp -R src-overrides/. site/
-          fi
+
+      - name: Apply v0.2 source overrides
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat src-overrides/app.js.part* > site/app.js
+          cat src-overrides/styles.css.part* > site/styles.css
+          cat src-overrides/index.html.part* > site/index.html
+          cat src-overrides/sw.js.part* > site/sw.js
+          cat src-overrides/README.md.part* > site/README.md
+          node --check site/app.js
+          grep -q "玄历 v0.2" site/app.js
+          grep -q "大运起运算法" site/index.html
 
       - name: Vendor deterministic lunar calendar library
         shell: bash
