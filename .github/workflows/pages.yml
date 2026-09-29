@@ -29,17 +29,15 @@ jobs:
           cat .deploy/part*.b64 | base64 -d > /tmp/xuanli.zip
           unzip -q /tmp/xuanli.zip -d /tmp/xuanli-src
           cp -R /tmp/xuanli-src/bazi-calendar-pwa/. site/
+          if [ -d src-overrides ]; then
+            cp -R src-overrides/. site/
+          fi
 
       - name: Vendor deterministic lunar calendar library
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 --retry-delay 2 \
-            https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.js \
-            -o site/lunar.js
-          sed -i 's#https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.js#./lunar.js#g' site/index.html
-          sed -i "s#'https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.js'#'./lunar.js'#g" site/sw.js
-          sed -i "s/xuanli-v1.0.1/xuanli-v1.0.2/g" site/sw.js
+          curl -fL --retry 3 --retry-delay 2             https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.js             -o site/lunar.js
           test -s site/lunar.js
           grep -q './lunar.js' site/index.html
           grep -q './lunar.js' site/sw.js
