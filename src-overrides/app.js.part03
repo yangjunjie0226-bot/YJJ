@@ -1,0 +1,82 @@
+ass="list-clean">${g.lines.length?g.lines.map(x=>`<li><span class="relation-tag">关系</span>${html(x)}</li>`).join(''):'<li>与原局未检测到本版列出的主要合冲刑害关系</li>'}</ul></div>`).join('')}`;
+  }
+
+  function ecPillar(ec,key,gz,dayStem){
+    if(!gz) return {name:key,gz:null};
+    const methodPrefix={年:'Year',月:'Month',日:'Day',时:'Time'}[key];
+    const hide=arr(safe(ec,`get${methodPrefix}HideGan`,HIDDEN_STEMS[gz[1]]||[]));
+    const hideGod=arr(safe(ec,`get${methodPrefix}ShiShenZhi`,hide.map(s=>tenGod(dayStem,s))));
+    return {
+      name:key,
+      gz,
+      stem:gz[0],branch:gz[1],
+      stemGod:safe(ec,`get${methodPrefix}ShiShenGan`,key==='日'?'日主':tenGod(dayStem,gz[0])),
+      hide,hideGod,
+      wx:safe(ec,`get${methodPrefix}WuXing`,`${STEM_INFO[gz[0]]?.[0]||'—'}${BRANCH_ELEMENT[gz[1]]||'—'}`),
+      nayin:safe(ec,`get${methodPrefix}NaYin`,NAYIN[gz]||'—'),
+      dishi:safe(ec,`get${methodPrefix}DiShi`,'—'),
+      xun:safe(ec,`get${methodPrefix}Xun`,'—'),
+      kong:safe(ec,`get${methodPrefix}XunKong`,'—')
+    };
+  }
+
+  function renderBaziTable(chart){
+    const p=chart.pillars,ec=chart.eightChar,dm=p.day[0];
+    const cols=[ecPillar(ec,'年',p.year,dm),ecPillar(ec,'月',p.month,dm),ecPillar(ec,'日',p.day,dm),ecPillar(ec,'时',p.time,dm)];
+    const row=(label,fn)=>`<div class="bazi-row"><div class="bazi-label">${label}</div>${cols.map(c=>`<div class="bazi-cell">${c.gz?fn(c):'<span class="muted">—</span>'}</div>`).join('')}</div>`;
+    return `<div class="bazi-table">
+      <div class="bazi-row bazi-head"><div class="bazi-label"></div>${cols.map(c=>`<div class="bazi-cell"><b>${c.name}柱</b></div>`).join('')}</div>
+      ${row('十神',c=>`<span>${html(c.stemGod)}</span>`)}
+      ${row('天干',c=>`<strong class="big-gz">${html(c.stem)}</strong><small>${html(STEM_INFO[c.stem]?.join('')||'—')}</small>`)}
+      ${row('地支',c=>`<strong class="big-gz">${html(c.branch)}</strong><small>${html(BRANCH_ELEMENT[c.branch]||'—')}</small>`)}
+      ${row('藏干',c=>c.hide.map((s,i)=>`<span class="hide-stem">${html(s)}<small>${html(c.hideGod[i]||tenGod(dm,s))}</small></span>`).join(''))}
+      ${row('纳音',c=>`<span>${html(c.nayin)}</span>`)}
+      ${row('地势',c=>`<span>${html(c.dishi)}</span>`)}
+      ${row('旬空',c=>`<span>${html(c.kong)}</span><small>${html(c.xun)}</small>`)}
+    </div>`;
+  }
+
+  function renderDaYun(chart){
+    const dy=daYunData(chart,new Date().getFullYear());
+    if(!chart.hasTime) return `<div class="card"><div class="section-title">大运</div><div class="warning">出生时辰未知，暂不计算起运时间和大运，避免用假定时辰生成结果。</div></div>`;
+    if(state.profile.gender==='unknown') return `<div class="card"><div class="section-title">大运</div><div class="warning">请在“我的”设置性别后再计算大运。顺逆排规则需要使用年干阴阳与性别。</div></div>`;
+    if(!dy) return `<div class="card"><div class="section-title">大运</div><p class="muted">大运暂时无法计算，请检查出生资料。</p></div>`;
+    const yun=dy.yun;
+    const startAge=`${safe(yun,'getStartYear',0)}年 ${safe(yun,'getStartMonth',0)}月 ${safe(yun,'getStartDay',0)}日${safe(yun,'getStartHour',0)?` ${safe(yun,'getStartHour',0)}时`:''}`;
+    const startSolar=safe(yun,'getStartSolar',null);
+    return `<div class="card"><div class="section-title">大运</div><div class="kv-grid">
+      ${kv('排运方向',safe(yun,'isForward',false)?'顺排':'逆排')}${kv('起运折算',startAge)}
+      ${kv('起运公历',solarText(startSolar))}${kv('起运算法',dy.rule===1?'流派1：3天1年、1天4个月、1时辰10天':'流派2：按分钟折算')}
+    </div><div class="dayun-scroll">${dy.list.slice(0,8).map(x=>{
+      const current=x===dy.current;
+      return `<div class="dayun-item ${current?'current':''}"><span>${safe(x,'getStartAge','')}–${safe(x,'getEndAge','')}岁</span><strong>${html(safe(x,'getGanZhi','—'))}</strong><small>${safe(x,'getStartYear','')}–${safe(x,'getEndYear','')}</small>${current?'<i>当前</i>':''}</div>`;
+    }).join('')}</div><div class="note-line">大运起运算法存在不同门派口径，当前使用你在“我的”中选择的算法；结果不与其他流派强行混用。</div></div>`;
+  }
+
+  function renderChart(){
+    const chart=birthChart();
+    if(!chart){$('#chartEmpty').classList.remove('hidden');$('#chartContent').classList.add('hidden');return;}
+    $('#chartEmpty').classList.add('hidden');$('#chartContent').classList.remove('hidden');
+    const p=chart.pillars,dm=p.day[0],ec=chart.eightChar;
+    const boundary=boundaryPossibilities();
+    const unknownWarn=!chart.hasTime?'<div class="warning">出生时辰未知：时柱不计算；若实际出生在23:00–23:59，日柱还会受你选择的“晚子时换日”规则影响。</div>':'';
+    let boundaryWarn='';
+    if(boundary){
+      const jq=boundary.currentJie&&boundary.currentJie!=='—'?`${safe(boundary.currentJie,'getName','交节')} ${solarText(safe(boundary.currentJie,'getSolar',null),true)}`:'当天存在柱位边界';
+      boundaryWarn=`<div class="warning strong-warning"><b>出生当天存在交界：${html(jq)}</b><br>00:01 参考：${html(boundary.pa.year)}年 ${html(boundary.pa.month)}月 ${html(boundary.pa.day)}日；23:59 参考：${html(boundary.pb.year)}年 ${html(boundary.pb.month)}月 ${html(boundary.pb.day)}日。因时辰未知，不能把其中一套当成唯一确定命盘。</div>`;
+    }
+    const originalSolar=`${safe(chart.solar,'getYear','')}-${pad(safe(chart.solar,'getMonth',''))}-${pad(safe(chart.solar,'getDay',''))}${chart.hasTime?` ${pad(chart.h)}:${pad(chart.min)}`:''}`;
+
+    const extra=[];
+    if(ec){
+      extra.push(['胎元',safe(ec,'getTaiYuan','—')],['胎元纳音',safe(ec,'getTaiYuanNaYin','—')],['胎息',safe(ec,'getTaiXi','—')],['胎息纳音',safe(ec,'getTaiXiNaYin','—')]);
+      if(chart.hasTime){
+        extra.push(['命宫',safe(ec,'getMingGong','—')],['命宫纳音',safe(ec,'getMingGongNaYin','—')],['身宫',safe(ec,'getShenGong','—')],['身宫纳音',safe(ec,'getShenGongNaYin','—')]);
+      }
+    }
+
+    $('#chartContent').innerHTML=`${unknownWarn}${boundaryWarn}
+      <div class="card"><div class="section-title">专业四柱</div><div class="date-sub chart-sub">公历 ${html(originalSolar)}${state.profile.birthPlace?` · ${html(state.profile.birthPlace)}`:''}</div>${renderBaziTable(chart)}</div>
+      <div class="card"><div class="section-title">命局基础数据</div><div class="kv-grid">${kv('日主',`${dm} · ${STEM_INFO[dm]?.join('')||'—'}`)}${kv('月令',p.month?.[1]||'—')}${extra.map(([k,v])=>kv(k,v)).join('')}</div><div class="note-line">十神、藏干、纳音、地势与旬空均按同一四柱规则计算；“胎元/胎息/命宫/身宫”属于传统命理辅助信息，不作为现代科学预测结论。</div></div>
+      ${renderDaYun(chart)}
+      <div class="card"><div cl
