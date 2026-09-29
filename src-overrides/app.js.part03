@@ -1,4 +1,4 @@
-ass="list-clean">${g.lines.length?g.lines.map(x=>`<li><span class="relation-tag">关系</span>${html(x)}</li>`).join(''):'<li>与原局未检测到本版列出的主要合冲刑害关系</li>'}</ul></div>`).join('')}`;
+ass="list-clean">${g.lines.length?g.lines.map(x=>`<li><span class="relation-tag">关系</span>${html(x)}</li>`).join(''):'<li>与原局未检测到本版列出的主要合冲刑害关系</li>'}</ul></div>`).join('')}${window.BaziStrength?window.BaziStrength.renderDaily(chart.pillars,transit):''}`;
   }
 
   function ecPillar(ec,key,gz,dayStem){
@@ -79,4 +79,5 @@ ass="list-clean">${g.lines.length?g.lines.map(x=>`<li><span class="relation-tag"
       <div class="card"><div class="section-title">专业四柱</div><div class="date-sub chart-sub">公历 ${html(originalSolar)}${state.profile.birthPlace?` · ${html(state.profile.birthPlace)}`:''}</div>${renderBaziTable(chart)}</div>
       <div class="card"><div class="section-title">命局基础数据</div><div class="kv-grid">${kv('日主',`${dm} · ${STEM_INFO[dm]?.join('')||'—'}`)}${kv('月令',p.month?.[1]||'—')}${extra.map(([k,v])=>kv(k,v)).join('')}</div><div class="note-line">十神、藏干、纳音、地势与旬空均按同一四柱规则计算；“胎元/胎息/命宫/身宫”属于传统命理辅助信息，不作为现代科学预测结论。</div></div>
       ${renderDaYun(chart)}
-      <div class="card"><div cl
+      ${window.BaziStrength?window.BaziStrength.renderNatal(p):''}
+      <div class="card hidden"><div cl
