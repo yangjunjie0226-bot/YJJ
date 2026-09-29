@@ -1,0 +1,110 @@
+argetStem];
+    const same=dp===tp;
+    if(de===te) return same?'比肩':'劫财';
+    if(GENERATES[de]===te) return same?'食神':'伤官';
+    if(GENERATES[te]===de) return same?'偏印':'正印';
+    if(CONTROLS[de]===te) return same?'偏财':'正财';
+    if(CONTROLS[te]===de) return same?'七杀':'正官';
+    return '—';
+  }
+
+  function pairHas(a,b,pairs){ return pairs.some(p=>p.includes(a)&&p.includes(b)); }
+  function branchRelations(a,b){
+    const out=[];
+    if(!a||!b) return out;
+    if(pairHas(a,b,LIU_HE)) out.push('六合');
+    if(pairHas(a,b,LIU_CHONG)) out.push('六冲');
+    if(pairHas(a,b,LIU_HAI)) out.push('六害');
+    if(pairHas(a,b,LIU_PO)) out.push('六破');
+    if((a==='子'&&b==='卯')||(a==='卯'&&b==='子')) out.push('子卯刑');
+    if(a===b&&SELF_XING.includes(a)) out.push('自刑');
+    for(const g of SAN_XING_GROUPS){ if(a!==b&&g.includes(a)&&g.includes(b)) out.push(`${g.join('')}刑组`); }
+    return [...new Set(out)];
+  }
+
+  function stemRelations(a,b){
+    const out=[]; if(!STEM_INFO[a]||!STEM_INFO[b])return out;
+    if(pairHas(a,b,STEM_HE)) out.push('天干五合');
+    const ae=STEM_INFO[a][0],be=STEM_INFO[b][0];
+    if(GENERATES[ae]===be) out.push(`${a}生${b}`);
+    else if(GENERATES[be]===ae) out.push(`${b}生${a}`);
+    if(CONTROLS[ae]===be) out.push(`${a}克${b}`);
+    else if(CONTROLS[be]===ae) out.push(`${b}克${a}`);
+    if(a===b) out.push('同干');
+    return out;
+  }
+
+  function multiBranchRelations(transitBranch,natalBranches){
+    const pool=new Set([transitBranch,...natalBranches]);
+    const out=[];
+    SAN_HE.forEach(g=>{if(g.branches.every(x=>pool.has(x))) out.push(`具备${g.branches.join('')}三合${g.element}局支位组合`);});
+    SAN_HUI.forEach(g=>{if(g.branches.every(x=>pool.has(x))) out.push(`具备${g.branches.join('')}三会${g.element}局支位组合`);});
+    SAN_XING_GROUPS.forEach(g=>{if(g.every(x=>pool.has(x))) out.push(`具备${g.join('')}三刑支位组合`);});
+    return out;
+  }
+
+  function renderCalendar(){
+    if(typeof Solar==='undefined'){ $('#calendarGrid').innerHTML='<div class="warning" style="grid-column:1/-1">历法核心加载失败，请联网刷新一次。首次成功打开后会进入离线缓存。</div>'; return; }
+    const y=state.cursor.getFullYear(),m=state.cursor.getMonth();
+    $('#monthTitle').textContent=`${y}年 ${m+1}月`;
+    const terms=[];
+    for(let day=1;day<=daysInMonth(y,m);day++){
+      const lunar=lunarForDate(new Date(y,m,day)); const jq=safe(lunar,'getJieQi','');
+      if(jq&&jq!=='—') terms.push(`${m+1}月${day}日 · ${jq}`);
+    }
+    $('#solarTermStrip').innerHTML=terms.length?terms.map(t=>`<span class="term-chip">${html(t)}</span>`).join(''):'<span class="term-chip">本月无节气数据</span>';
+
+    const first=new Date(y,m,1); const start=new Date(y,m,1-first.getDay());
+    let cells='';
+    for(let i=0;i<42;i++){
+      const d=new Date(start);d.setDate(start.getDate()+i);
+      const lunar=lunarForDate(d);
+      const label=lunarLabel(lunar);
+      const gz=safe(lunar,'getDayInGanZhi', '');
+      const festivals=[...arr(safe(lunar,'getFestivals',[])),...arr(safe(lunar,'getOtherFestivals',[]))];
+      const jq=safe(lunar,'getJieQi','');
+      const cls=['day-cell',d.getMonth()!==m?'other':'',sameDate(d,state.selected)?'selected':'',sameDate(d,new Date())?'today':''].filter(Boolean).join(' ');
+      cells+=`<button class="${cls}" data-date="${dateKey(d)}">${(festivals.length||jq)?'<i class="festival-dot"></i>':''}<span class="day-num">${d.getDate()}</span><span class="lunar-label">${html(label)}</span><span class="gz-label">${html(gz)}日</span></button>`;
+    }
+    $('#calendarGrid').innerHTML=cells;
+    $$('#calendarGrid [data-date]').forEach(btn=>btn.addEventListener('click',()=>{
+      const [yy,mm,dd]=btn.dataset.date.split('-').map(Number);state.selected=new Date(yy,mm-1,dd);state.cursor=new Date(yy,mm-1,1);renderCalendar();renderDetail();switchView('detail');
+    }));
+  }
+
+  function kv(label,value){ return `<div class="kv"><b>${html(label)}</b><span>${html(value||'—')}</span></div>`; }
+
+  function renderJieQiBoundary(lunar){
+    const prev=safe(lunar,'getPrevJieQi',null,false);
+    const next=safe(lunar,'getNextJieQi',null,false);
+    const prevJie=safe(lunar,'getPrevJie',null,false);
+    const nextJie=safe(lunar,'getNextJie',null,false);
+    const item=(title,jq)=>jq&&jq!=='—'?`${safe(jq,'getName','—')} · ${solarText(safe(jq,'getSolar',null),true)}`:'—';
+    let transition='';
+    try{
+      const early=lunarForDate(state.selected,0,1), late=lunarForDate(state.selected,23,59);
+      const pe=getExactPillars(early,false,'sect2'),pl=getExactPillars(late,false,'sect2');
+      if(pe.year!==pl.year||pe.month!==pl.month){
+        const current=safe(lunar,'getCurrentJie',null);
+        const when=current&&current!=='—'?`${safe(current,'getName','交节')} ${solarText(safe(current,'getSolar',null),true)}`:'当天交节';
+        transition=`<div class="warning" style="margin-top:10px;margin-bottom:0"><b>${html(when)}</b><br>交节前参考：${html(pe.year)}年 ${html(pe.month)}月；交节后参考：${html(pl.year)}年 ${html(pl.month)}月。若要看当天某一时刻，应按具体时间判断。</div>`;
+      }
+    }catch{}
+    $('#jieqiCard').innerHTML=`<div class="section-title">节气交接</div><div class="kv-grid">
+      ${kv('上一节气',item('',prev))}${kv('下一节气',item('',next))}
+      ${kv('上一“节”',item('',prevJie))}${kv('下一“节”',item('',nextJie))}
+    </div>${transition}<div class="note-line">八字月柱按“节”交月，不按农历初一换月。本页使用精确节气时刻参与年月柱计算。</div>`;
+  }
+
+  function renderDetail(){
+    if(typeof Solar==='undefined')return;
+    const d=state.selected; const solar=solarForDate(d,12,0); const lunar=solar.getLunar();
+    const pillars=getExactPillars(lunar,false,'sect2');
+    const lunarText=`农历${safe(lunar,'getYearInChinese','')}年${safe(lunar,'getMonthInChinese','')}月${safe(lunar,'getDayInChinese','')}`;
+    const festivals=[...arr(safe(lunar,'getFestivals',[])),...arr(safe(lunar,'getOtherFestivals',[])),...arr(safe(solar,'getFestivals',[]))];
+    const jq=safe(lunar,'getJieQi',''); if(jq&&jq!=='—')festivals.unshift(jq);
+    $('#dateHero').innerHTML=`<div class="date-big">${d.getDate()}</div><div class="date-sub">${d.getFullYear()}年${d.getMonth()+1}月 · 星期${'日一二三四五六'[d.getDay()]}</div><div class="date-lunar">${html(lunarText)}</div><div class="pill-row"><span class="pill">${html(pillars.year)}年</span><span class="pill">${html(pillars.month)}月</span><span class="pill">${html(pillars.day)}日</span>${festivals.slice(0,3).map(x=>`<span class="pill">${html(x)}</span>`).join('')}</div>`;
+
+    const dayGz=pillars.day, dayStem=dayGz[0];
+    $('#ganzhiCard').innerHTML=`<div class="section-title">当天命理信息</div><div class="kv-grid">
+      ${kv('年柱',pillars.year)}${kv('月柱',pillars.month)}
