@@ -35,12 +35,15 @@ jobs:
         run: |
           set -euo pipefail
           cat src-overrides/app.js.part* > site/app.js
+          cat src-overrides/bazi-engine.js.part* > site/bazi-engine.js
           cat src-overrides/styles.css.part* > site/styles.css
           cat src-overrides/index.html.part* > site/index.html
           cat src-overrides/sw.js.part* > site/sw.js
           cat src-overrides/README.md.part* > site/README.md
           node --check site/app.js
-          grep -q "玄历 v0.2" site/app.js
+          node --check site/bazi-engine.js
+          grep -q "0.3.0" site/app.js
+          grep -q "BaziStrength" site/bazi-engine.js
           grep -q "大运起运算法" site/index.html
 
       - name: Vendor deterministic lunar calendar library
