@@ -1,0 +1,111 @@
+}${kv('日柱',pillars.day)}${kv('日主五行',`${STEM_INFO[dayStem]?.join('')||'—'}${dayStem}`)}
+      ${kv('日柱纳音',NAYIN[dayGz]||safe(lunar,'getDayNaYin','—'))}${kv('日干临日支地势',safe(pillars.eightChar,'getDayDiShi','—'))}
+      ${kv('旬',safe(lunar,'getDayXun','—'))}${kv('旬空',safe(lunar,'getDayXunKong','—'))}
+      ${kv('建除十二神',safe(lunar,'getZhiXing','—'))}${kv('值日天神',`${safe(lunar,'getDayTianShen','—')} · ${safe(lunar,'getDayTianShenType','—')}`)}
+      ${kv('二十八宿',`${safe(lunar,'getXiu','—')} · ${safe(lunar,'getXiuLuck','—')}`)}${kv('月相',safe(lunar,'getYueXiang','—'))}
+      ${kv('冲',safe(lunar,'getDayChongDesc',safe(lunar,'getChongDesc','—')))}${kv('煞',safe(lunar,'getDaySha',safe(lunar,'getSha','—')))}
+      ${kv('彭祖百忌·干',safe(lunar,'getPengZuGan','—'))}${kv('彭祖百忌·支',safe(lunar,'getPengZuZhi','—'))}
+    </div>`;
+
+    renderJieQiBoundary(lunar);
+
+    const yi=arr(safe(lunar,'getDayYi',safe(lunar,'getYi',[]))).join(' · ')||'无';
+    const ji=arr(safe(lunar,'getDayJi',safe(lunar,'getJi',[]))).join(' · ')||'无';
+    const jiShen=arr(safe(lunar,'getDayJiShen',[])).join(' · ');
+    const xiongSha=arr(safe(lunar,'getDayXiongSha',[])).join(' · ');
+    $('#huangliCard').innerHTML=`<div class="section-title">传统黄历</div><div class="yi-ji"><div class="yi"><b>宜</b><p>${html(yi)}</p></div><div class="ji"><b>忌</b><p>${html(ji)}</p></div></div>${jiShen||xiongSha?`<div class="kv-grid" style="margin-top:10px">${kv('吉神宜趋',jiShen||'—')}${kv('凶煞宜忌',xiongSha||'—')}</div>`:''}`;
+
+    renderHours(d);
+    renderPersonalToday(lunar);
+  }
+
+  function renderHours(d){
+    const hours=[23,1,3,5,7,9,11,13,15,17,19,21];
+    const names=['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+    const rows=hours.map((h,i)=>{
+      const lunar=lunarForDate(d,h,0);const gz=safe(lunar,'getTimeInGanZhi','—');
+      const ts=safe(lunar,'getTimeTianShen',''); const luck=safe(lunar,'getTimeTianShenLuck','');
+      const range=i===0?'23:00–00:59':`${pad(h)}:00–${pad(h+1)}:59`;
+      return `<div class="hour-row"><strong>${names[i]}时</strong><span>${html(gz)}</span><span>${range}${ts&&ts!=='—'?` · ${html(ts)}${luck&&luck!=='—'?`(${html(luck)})`:''}`:''}</span></div>`;
+    }).join('');
+    $('#hourCard').innerHTML=`<div class="section-title">十二时辰</div><div class="hour-list">${rows}</div>`;
+  }
+
+  function birthLunarFromProfile(p, overrideTime=null){
+    const y=Number(p.year),m=Number(p.month),d=Number(p.day);
+    const hasTime=overrideTime!==null?true:Boolean(p.time);
+    const timeString=overrideTime!==null?overrideTime:p.time;
+    const [h,min]=hasTime?timeString.split(':').map(Number):[12,0];
+    if(p.calendarType==='lunar'){
+      const lm=p.leap?-m:m;
+      const lunar=Lunar.fromYmdHms(y,lm,d,h,min,0);
+      return {lunar,solar:lunar.getSolar(),hasTime,h,min};
+    }
+    const solar=Solar.fromYmdHms ? Solar.fromYmdHms(y,m,d,h,min,0) : Solar.fromDate(new Date(y,m-1,d,h,min));
+    return {solar,lunar:solar.getLunar(),hasTime,h,min};
+  }
+
+  function birthChart(){
+    if(!state.profile||typeof Solar==='undefined') return null;
+    try{
+      const src=birthLunarFromProfile(state.profile);
+      const sect=state.profile.ziRule||'sect2';
+      const pillars=getExactPillars(src.lunar,src.hasTime,sect);
+      return {...src,pillars,eightChar:pillars.eightChar};
+    }catch(e){ console.warn(e); return null; }
+  }
+
+  function boundaryPossibilities(){
+    if(!state.profile || state.profile.time) return null;
+    try{
+      const a=birthLunarFromProfile(state.profile,'00:01');
+      const b=birthLunarFromProfile(state.profile,'23:59');
+      const sect=state.profile.ziRule||'sect2';
+      const pa=getExactPillars(a.lunar,true,sect),pb=getExactPillars(b.lunar,true,sect);
+      const changed=pa.year!==pb.year||pa.month!==pb.month;
+      if(!changed) return null;
+      const dayLunar=birthLunarFromProfile(state.profile,'12:00').lunar;
+      const currentJie=safe(dayLunar,'getCurrentJie',null);
+      return {pa,pb,currentJie};
+    }catch{return null;}
+  }
+
+  function relationLine(transitName,transitGz,natalName,natalGz){
+    if(!transitGz||!natalGz||transitGz.length<2||natalGz.length<2)return [];
+    const sr=stemRelations(transitGz[0],natalGz[0]);
+    const br=branchRelations(transitGz[1],natalGz[1]);
+    return [...sr.map(x=>`${transitName}${transitGz[0]} 与 ${natalName}${natalGz[0]}：${x}`),...br.map(x=>`${transitName}${transitGz[1]} 与 ${natalName}${natalGz[1]}：${x}`)];
+  }
+
+  function daYunData(chart,targetYear=new Date().getFullYear()){
+    if(!chart?.hasTime || !chart.eightChar || !state.profile || state.profile.gender==='unknown') return null;
+    try{
+      const gender=state.profile.gender==='male'?1:0;
+      const rule=Number(state.profile.yunRule||1)===2?2:1;
+      const yun=chart.eightChar.getYun(gender,rule);
+      const list=yun.getDaYun(10).filter(x=>safe(x,'getIndex',0)>0);
+      const current=list.find(x=>targetYear>=safe(x,'getStartYear',9999)&&targetYear<=safe(x,'getEndYear',-1))||null;
+      return {yun,list,current,rule};
+    }catch(e){console.warn(e);return null;}
+  }
+
+  function renderPersonalToday(transitLunar){
+    const card=$('#personalToday'); const chart=birthChart();
+    if(!chart){ card.classList.add('hidden'); return; }
+    const transit=getExactPillars(transitLunar,false,'sect2');
+    const natalPillars=[['年柱',chart.pillars.year],['月柱',chart.pillars.month],['日柱',chart.pillars.day]];
+    if(chart.pillars.time)natalPillars.push(['时柱',chart.pillars.time]);
+    const transits=[['流年',transit.year],['流月',transit.month],['流日',transit.day]];
+    const groups=[];
+    const dm=chart.pillars.day[0];
+    for(const [tn,tgz] of transits){
+      const lines=natalPillars.flatMap(([nn,ngz])=>relationLine(tn,tgz,nn,ngz));
+      const natalBranches=natalPillars.map(x=>x[1]?.[1]).filter(Boolean);
+      lines.push(...multiBranchRelations(tgz?.[1],natalBranches).map(x=>`${tn}${tgz?.[1]}：${x}`));
+      groups.push({tn,tgz,tenGod:tenGod(dm,tgz?.[0]),lines:[...new Set(lines)]});
+    }
+    const dy=daYunData(chart,state.selected.getFullYear());
+    card.classList.remove('hidden');
+    card.innerHTML=`<div class="section-title">所选日期与你</div><div class="warning">这里显示的是可复算的干支结构关系。单个“冲、合、刑、害”不直接等同于现实中的吉凶事件。</div>
+      <div class="flow-grid">${groups.map(g=>`<div class="flow-card"><b>${g.tn}</b><strong>${html(g.tgz)}</strong><span>${html(g.tenGod)}</span></div>`).join('')}${dy?.current?`<div class="flow-card accent"><b>大运</b><strong>${html(safe(dy.current,'getGanZhi','—'))}</strong><span>${safe(dy.current,'getStartYear','')}–${safe(dy.current,'getEndYear','')}</span></div>`:''}</div>
+      ${groups.map(g=>`<div class="relation-block"><b>${g.tn} ${html(g.tgz)} · ${html(g.tenGod)}</b><ul cl
