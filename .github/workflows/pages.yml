@@ -44,7 +44,6 @@ jobs:
           node --check site/app.js
           node --check site/bazi-engine.js
           node --check site/bazi-advanced.js
-          grep -q "0.3.0" site/app.js
           grep -q "BaziStrength" site/bazi-engine.js
           grep -q "BaziAdvanced" site/bazi-advanced.js
           grep -q "0.4.0" site/app.js
