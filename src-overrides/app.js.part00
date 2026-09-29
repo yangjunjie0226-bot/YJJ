@@ -1,0 +1,107 @@
+/* 玄历 v0.2 - 确定性历法/八字结构规则，不使用随机命理结果 */
+(() => {
+  'use strict';
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const STORAGE_KEY = 'xuanli.profile.v1';
+  const APP_VERSION = '0.2.0';
+  const LUNAR_LIB_VERSION = '1.7.7';
+
+  const STEMS = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+  const BRANCHES = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+  const STEM_INFO = {
+    甲:['木','阳'],乙:['木','阴'],丙:['火','阳'],丁:['火','阴'],戊:['土','阳'],己:['土','阴'],庚:['金','阳'],辛:['金','阴'],壬:['水','阳'],癸:['水','阴']
+  };
+  const BRANCH_ELEMENT = {子:'水',丑:'土',寅:'木',卯:'木',辰:'土',巳:'火',午:'火',未:'土',申:'金',酉:'金',戌:'土',亥:'水'};
+  const HIDDEN_STEMS = {子:['癸'],丑:['己','癸','辛'],寅:['甲','丙','戊'],卯:['乙'],辰:['戊','乙','癸'],巳:['丙','戊','庚'],午:['丁','己'],未:['己','丁','乙'],申:['庚','壬','戊'],酉:['辛'],戌:['戊','辛','丁'],亥:['壬','甲']};
+  const GENERATES = {木:'火',火:'土',土:'金',金:'水',水:'木'};
+  const CONTROLS = {木:'土',土:'水',水:'火',火:'金',金:'木'};
+
+  const LIU_HE = [['子','丑'],['寅','亥'],['卯','戌'],['辰','酉'],['巳','申'],['午','未']];
+  const LIU_CHONG = [['子','午'],['丑','未'],['寅','申'],['卯','酉'],['辰','戌'],['巳','亥']];
+  const LIU_HAI = [['子','未'],['丑','午'],['寅','巳'],['卯','辰'],['申','亥'],['酉','戌']];
+  const LIU_PO = [['子','酉'],['卯','午'],['辰','丑'],['戌','未'],['寅','亥'],['巳','申']];
+  const STEM_HE = [['甲','己'],['乙','庚'],['丙','辛'],['丁','壬'],['戊','癸']];
+  const SAN_HE = [
+    {branches:['申','子','辰'],element:'水'}, {branches:['亥','卯','未'],element:'木'},
+    {branches:['寅','午','戌'],element:'火'}, {branches:['巳','酉','丑'],element:'金'}
+  ];
+  const SAN_HUI = [
+    {branches:['寅','卯','辰'],element:'木'}, {branches:['巳','午','未'],element:'火'},
+    {branches:['申','酉','戌'],element:'金'}, {branches:['亥','子','丑'],element:'水'}
+  ];
+  const SAN_XING_GROUPS = [['寅','巳','申'],['丑','戌','未']];
+  const SELF_XING = ['辰','午','酉','亥'];
+
+  const NAYIN_PAIRS = [
+    ['甲子','乙丑','海中金'],['丙寅','丁卯','炉中火'],['戊辰','己巳','大林木'],['庚午','辛未','路旁土'],['壬申','癸酉','剑锋金'],
+    ['甲戌','乙亥','山头火'],['丙子','丁丑','涧下水'],['戊寅','己卯','城头土'],['庚辰','辛巳','白蜡金'],['壬午','癸未','杨柳木'],
+    ['甲申','乙酉','泉中水'],['丙戌','丁亥','屋上土'],['戊子','己丑','霹雳火'],['庚寅','辛卯','松柏木'],['壬辰','癸巳','长流水'],
+    ['甲午','乙未','沙中金'],['丙申','丁酉','山下火'],['戊戌','己亥','平地木'],['庚子','辛丑','壁上土'],['壬寅','癸卯','金箔金'],
+    ['甲辰','乙巳','覆灯火'],['丙午','丁未','天河水'],['戊申','己酉','大驿土'],['庚戌','辛亥','钗钏金'],['壬子','癸丑','桑柘木'],
+    ['甲寅','乙卯','大溪水'],['丙辰','丁巳','沙中土'],['戊午','己未','天上火'],['庚申','辛酉','石榴木'],['壬戌','癸亥','大海水']
+  ];
+  const NAYIN = Object.fromEntries(NAYIN_PAIRS.flatMap(([a,b,n]) => [[a,n],[b,n]]));
+
+  const state = {
+    cursor: new Date(),
+    selected: new Date(),
+    profile: loadProfile()
+  };
+  state.cursor = new Date(state.selected.getFullYear(), state.selected.getMonth(), 1);
+
+  function safe(obj, method, fallback='—', ...args){
+    try { return obj && typeof obj[method] === 'function' ? obj[method](...args) : fallback; } catch { return fallback; }
+  }
+  function arr(v){ return Array.isArray(v) ? v : (v && v !== '—' ? [v] : []); }
+  function html(v){ return String(v ?? '').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function dateKey(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  function sameDate(a,b){ return dateKey(a)===dateKey(b); }
+  function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
+  function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1800); }
+  function loadProfile(){ try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');}catch{return null;} }
+  function saveProfile(p){ localStorage.setItem(STORAGE_KEY,JSON.stringify(p)); state.profile=p; }
+  function toDate(solar){ return new Date(safe(solar,'getYear',0),safe(solar,'getMonth',1)-1,safe(solar,'getDay',1),safe(solar,'getHour',0),safe(solar,'getMinute',0),safe(solar,'getSecond',0)); }
+  function solarText(solar, withSeconds=false){
+    if(!solar) return '—';
+    const y=safe(solar,'getYear',''),m=pad(safe(solar,'getMonth','')),d=pad(safe(solar,'getDay','')),h=pad(safe(solar,'getHour','')),mi=pad(safe(solar,'getMinute',''));
+    const sec=pad(safe(solar,'getSecond',''));
+    return `${y}-${m}-${d} ${h}:${mi}${withSeconds?`:${sec}`:''}`;
+  }
+
+  function solarForDate(d,h=12,min=0){ return Solar.fromYmdHms ? Solar.fromYmdHms(d.getFullYear(),d.getMonth()+1,d.getDate(),h,min,0) : Solar.fromDate(new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,min)); }
+  function lunarForDate(d,h=12,min=0){ return solarForDate(d,h,min).getLunar(); }
+
+  function lunarLabel(lunar){
+    const festivals=[...arr(safe(lunar,'getFestivals',[])),...arr(safe(lunar,'getOtherFestivals',[]))];
+    const jq=safe(lunar,'getJieQi','');
+    if(jq && jq!=='—') return jq;
+    if(festivals.length) return festivals[0];
+    if(safe(lunar,'getDay',0)===1) return `${safe(lunar,'getMonthInChinese','')}月`;
+    return safe(lunar,'getDayInChinese','');
+  }
+
+  function getExactPillars(lunar, hasTime=true, sect='sect2'){
+    const ec=safe(lunar,'getEightChar',null);
+    if(ec && ec!=='—'){
+      safe(ec,'setSect',null,sect==='sect1'?1:2);
+      return {
+        year:safe(ec,'getYear',safe(lunar,'getYearInGanZhiExact','—')),
+        month:safe(ec,'getMonth',safe(lunar,'getMonthInGanZhiExact','—')),
+        day:safe(ec,'getDay',safe(lunar,'getDayInGanZhiExact2','—')),
+        time:hasTime?safe(ec,'getTime',null):null,
+        eightChar:ec
+      };
+    }
+    const year=safe(lunar,'getYearInGanZhiExact',safe(lunar,'getYearInGanZhi','—'));
+    const month=safe(lunar,'getMonthInGanZhiExact',safe(lunar,'getMonthInGanZhi','—'));
+    const dayMethod=sect==='sect1'?'getDayInGanZhiExact':'getDayInGanZhiExact2';
+    const day=safe(lunar,dayMethod,safe(lunar,'getDayInGanZhi','—'));
+    return {year,month,day,time:hasTime?safe(lunar,'getTimeInGanZhi',null):null,eightChar:null};
+  }
+
+  function tenGod(dayStem,targetStem){
+    if(!STEM_INFO[dayStem]||!STEM_INFO[targetStem]) return '—';
+    const [de,dp]=STEM_INFO[dayStem], [te,tp]=STEM_INFO[targetStem];
