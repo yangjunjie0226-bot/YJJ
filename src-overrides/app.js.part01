@@ -1,4 +1,4 @@
-argetStem];
+
     const same=dp===tp;
     if(de===te) return same?'比肩':'劫财';
     if(GENERATES[de]===te) return same?'食神':'伤官';
