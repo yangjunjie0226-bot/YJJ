@@ -1,0 +1,85 @@
+function analyzePattern(p){
+  const ds=p.day?.[0],mb=p.month?.[1]; if(!ds||!mb)return null;
+  const hidden=H[mb]||[], visible=pillarStems(p).filter((_,i)=>true);
+  const visibleExDay=['year','month','time'].map(k=>p[k]?.[0]).filter(Boolean);
+  const stage=monthDiShi(ds,mb);
+  const hiddenInfo=hidden.map((s,i)=>({stem:s,level:i===0?'本气':i===1?'中气':'余气',god:tenGod(ds,s),visible:visibleExDay.includes(s)}));
+  let candidate=null,basis='',coreGod=null,coreStem=null,confidence='候选';
+  if(stage==='临官'){
+    candidate='建禄格'; basis='日主临官在月令，建禄结构单列，不按普通财官印食格处理。';coreGod='比劫';coreStem=hidden[0]||null;confidence='明确结构';
+  }else if(stage==='帝旺'){
+    candidate='月刃/帝旺结构'; basis='日主帝旺在月令，按月刃/羊刃类结构单列；名称及细则随流派有差异。';coreGod='比劫';coreStem=hidden[0]||null;confidence='明确结构';
+  }else{
+    const main=hiddenInfo[0]||null;
+    const mainVisible=main?.visible;
+    const secondary=hiddenInfo.slice(1).find(x=>x.visible&&GOD_PATTERN[x.god]);
+    if(STORAGE.has(mb)){
+      if(mainVisible&&GOD_PATTERN[main.god]){
+        candidate='杂气'+GOD_PATTERN[main.god];coreGod=main.god;coreStem=main.stem;basis='辰戌丑未为杂气月令，本气透干，作为主要格局候选。';confidence='较强候选';
+      }else if(secondary){
+        candidate='杂气'+GOD_PATTERN[secondary.god];coreGod=secondary.god;coreStem=secondary.stem;basis=`辰戌丑未为杂气月令，${secondary.level}${secondary.stem}透干，作为格局候选。`;confidence='候选';
+      }else{
+        candidate='杂气月令·待定';coreGod=main?.god||null;coreStem=main?.stem||null;basis='辰戌丑未杂气未见可直接取格的月令藏干透出，本版不强定格。';confidence='待复核';
+      }
+    }else if(main&&GOD_PATTERN[main.god]){
+      if(mainVisible){candidate=GOD_PATTERN[main.god];coreGod=main.god;coreStem=main.stem;basis='月令本气透干，按月令为纲取格。';confidence='较强候选';}
+      else if(secondary){candidate=GOD_PATTERN[secondary.god];coreGod=secondary.god;coreStem=secondary.stem;basis=`月令本气未透，${secondary.level}${secondary.stem}透干，列为次级格局候选。`;confidence='候选';}
+      else{candidate=GOD_PATTERN[main.god]+'候选';coreGod=main.god;coreStem=main.stem;basis='月令本气未透，仅按月令十神列出候选，不判“成格”。';confidence='待复核';}
+    }else{
+      candidate='月令比劫结构';coreGod=main?.god||'比劫';coreStem=main?.stem||null;basis='月令本气属比劫，不直接套普通八格。';confidence='待复核';
+    }
+  }
+  const gods=visibleExDay.map(s=>tenGod(ds,s));
+  const signals=[];
+  if(gods.includes('正官')&&gods.includes('七杀'))signals.push('官杀并透：存在官杀混杂信号，需看去留、制化与根气。');
+  if(gods.includes('伤官')&&gods.includes('正官'))signals.push('伤官与正官同透：存在“伤官见官”结构信号，是否为忌需结合格局与制化。');
+  if(gods.includes('偏印')&&gods.includes('食神'))signals.push('偏印与食神同透：存在“枭食同见”信号，是否构成枭夺食需看强弱与制化。');
+  if((coreGod==='正印'||coreGod==='偏印')&&(gods.includes('正财')||gods.includes('偏财')))signals.push('印格候选见财透：存在财印相战/财破印风险信号，需看官杀通关与强弱。');
+  if((coreGod==='正财'||coreGod==='偏财')&&(gods.includes('食神')||gods.includes('伤官')))signals.push('财格候选见食伤：存在食伤生财的相生线索。');
+  if(coreGod==='七杀'&&(gods.includes('食神')||gods.includes('伤官')))signals.push('七杀格候选见食伤：存在制杀线索。');
+  if(coreGod==='七杀'&&(gods.includes('正印')||gods.includes('偏印')))signals.push('七杀格候选见印：存在杀印相生线索。');
+  if(coreGod==='正官'&&(gods.includes('正印')||gods.includes('偏印')))signals.push('正官格候选见印：存在官印相生线索。');
+  const supportRoles=SUPPORT_ROLES[coreGod]||[];
+  const dm=E[ds];
+  const supportElements=[...new Set(supportRoles.map(r=>roleEl(dm,r)).filter(Boolean))];
+  return {candidate,basis,coreGod,coreStem,confidence,hiddenInfo,signals,supportRoles,supportElements,stage};
+}
+function analyzeClimate(p){
+  const ds=p.day?.[0],mb=p.month?.[1]; if(!ds||!mb)return null;
+  const primary=QIONGTONG_PRIMARY[ds]?.[mb]||null;
+  const presence=primary?exactStemPresence(p,primary):{visible:0,hidden:0};
+  let state='无数据';
+  if(primary){
+    if(presence.visible>0)state='主调候干已透';
+    else if(presence.hidden>0)state='主调候干仅伏藏';
+    else state='原局未见主调候干';
+  }
+  return {dayStem:ds,monthBranch:mb,climate:CLIMATE[mb]||'—',primary,primaryElement:E[primary]||null,presence,state};
+}
+function composite(p){
+  const pattern=analyzePattern(p),climate=analyzeClimate(p);
+  const strength=window.BaziStrength?.analyze?window.BaziStrength.analyze(p):null;
+  const score={木:0,火:0,土:0,金:0,水:0};
+  const reason={木:[],火:[],土:[],金:[],水:[]};
+  if(strength&&!strength.candidate){
+    (strength.direction||[]).forEach((el,i)=>{score[el]+=i===0?2:1;reason[el].push('扶抑');});
+  }
+  if(climate?.primaryElement){score[climate.primaryElement]+=2;reason[climate.primaryElement].push('调候');}
+  (pattern?.supportElements||[]).forEach(el=>{score[el]+=1;reason[el].push('格局相神方向');});
+  const ranked=Object.entries(score).sort((a,b)=>b[1]-a[1]);
+  const max=ranked[0]?.[1]||0;
+  const overlap=ranked.filter(([,s])=>s>=2&&s===max).map(([el])=>el);
+  const secondary=ranked.filter(([,s])=>s>=2&&s<max).slice(0,2).map(([el])=>el);
+  return {pattern,climate,strength,score,reason,overlap,secondary,ranked};
+}
+function renderPattern(p){
+  const a=analyzePattern(p); if(!a)return '';
+  return `<div class="card advanced-card">
+    <div class="section-title">格局法 · 月令取格 <span class="beta-tag">v0.4</span></div>
+    <div class="adv-summary"><div><span>格局候选</span><strong>${esc(a.candidate)}</strong></div><div><span>确定度</span><strong>${esc(a.confidence)}</strong></div><div><span>月令十二长生</span><strong>${esc(a.stage)}</strong></div></div>
+    <div class="evidence-list"><p><b>取格依据：</b>${esc(a.basis)}</p><p><b>月令藏干：</b>${a.hiddenInfo.map(x=>`${x.level}${x.stem}（${x.god}）${x.visible?'已透':'未透'}`).map(esc).join('；')}</p>
+    <p><b>相神方向线索：</b>${esc(a.supportRoles.join('、')||'此结构不宜用单一相神口诀自动判定')}${a.supportElements.length?`（五行：${esc(a.supportElements.join('、'))}）`:''}</p></div>
+    ${a.signals.length?`<div class="signal-list">${a.signals.map(x=>`<p>• ${esc(x)}</p>`).join('')}</div>`:''}
+    <div class="note-line">本版只判断“格局候选、透干与结构信号”，不自动宣称成格、破格或富贵层级。格局成败还要结合根气、制化、清纯混杂与全局。</div>
+  </div>`;
+}
