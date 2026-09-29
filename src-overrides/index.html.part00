@@ -122,6 +122,7 @@
 
   <div id="toast" class="toast"></div>
   <script src="./lunar.js"></script>
+  <script src="./bazi-engine.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
