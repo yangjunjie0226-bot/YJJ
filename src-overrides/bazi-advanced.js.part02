@@ -1,0 +1,44 @@
+function renderClimate(p){
+  const a=analyzeClimate(p); if(!a)return '';
+  const presenceText=!a.primary?'—':a.presence.visible?('天干已见 '+a.presence.visible+' 处'):a.presence.hidden?('地支藏干见 '+a.presence.hidden+' 处'):'原局未见';
+  return '<div class="card advanced-card">'
+    +'<div class="section-title">调候法 · 寒暖燥湿 <span class="beta-tag">v0.4</span></div>'
+    +'<div class="adv-summary">'
+      +'<div><span>月令气候</span><strong>'+esc(a.climate)+'</strong></div>'
+      +'<div><span>主调候干</span><strong>'+esc(a.primary||'—')+(a.primaryElement?' · '+esc(a.primaryElement):'')+'</strong></div>'
+      +'<div><span>原局状态</span><strong>'+esc(a.state)+'</strong></div>'
+    +'</div>'
+    +'<div class="evidence-list">'
+      +'<p><b>检查结果：</b>'+esc(presenceText)+'</p>'
+      +'<p><b>使用方式：</b>调候关注寒暖燥湿，不等同于“身强身弱”。即使同一五行在扶抑法中不是第一优先，只要季节寒燥湿热问题突出，调候仍可能优先考虑对应天干。</p>'
+    +'</div>'
+    +'<div class="note-line">本版调候采用《穷通宝鉴》常见“十干十二月第一调候干”简表做初筛，只显示第一优先调候干与原局存在状态；不会把整部调候体系压缩成一个绝对用神。</div>'
+  +'</div>';
+}
+function renderComposite(p){
+  const c=composite(p); if(!c)return '';
+  const top=c.ranked.filter(([,s])=>s>0).slice(0,3);
+  let verdict='';
+  if(c.overlap.length){
+    verdict='三法交叉后，当前重合度最高的是：<b>'+esc(c.overlap.join('、'))+'</b>';
+  }else if(top.length){
+    verdict='三法暂未形成唯一重合方向，当前仅可按线索强弱排序：<b>'+top.map(([e])=>esc(e)).join('、')+'</b>';
+  }else{
+    verdict='当前信息不足，不生成综合取用方向。';
+  }
+  return '<div class="card composite-card">'
+    +'<div class="section-title">综合取用 · 三法交叉</div>'
+    +'<div class="warning">'+verdict+'</div>'
+    +'<div class="cross-grid">'
+      +top.map(([el,score])=>'<div><strong>'+esc(el)+'</strong><span>'+score+' 点</span><small>'+esc([...new Set(c.reason[el])].join(' + ')||'—')+'</small></div>').join('')
+    +'</div>'
+    +'<div class="evidence-list">'
+      +'<p><b>扶抑：</b>'+(c.strength?.candidate?esc(c.strength.candidate):esc((c.strength?.direction||[]).join('、')||'—'))+'</p>'
+      +'<p><b>格局：</b>'+esc(c.pattern?.candidate||'—')+'；相神方向 '+esc((c.pattern?.supportElements||[]).join('、')||'—')+'</p>'
+      +'<p><b>调候：</b>'+esc(c.climate?.primary||'—')+(c.climate?.primaryElement?'（'+esc(c.climate.primaryElement)+'）':'')+'；'+esc(c.climate?.state||'—')+'</p>'
+    +'</div>'
+    +'<div class="note-line">综合结果只在三套规则有交叉时提升置信度；若扶抑、格局、调候相互冲突，应用会保留冲突，不强行给出“唯一用神”。</div>'
+  +'</div>';
+}
+window.BaziAdvanced={analyzePattern,analyzeClimate,composite,renderPattern,renderClimate,renderComposite,version:'0.4.0'};
+})();
